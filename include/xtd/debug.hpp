@@ -17,7 +17,7 @@ Debugging
 /// @def XTD_ASSERT debug assertion. The expression is expanded and checked for debug builds
 #if (XTD_CONFIG_RELEASE & XTD_CONFIG)
   #define XTD_ASSERT(...)
-#elif ((XTD_COMPILER_CLANG | XTD_COMPILER_GCC) & XTD_COMPILER)
+#elif ((XTD_COMPILER_CLANG | XTD_COMPILER_GCC | XTD_COMPILER_MINGW) & XTD_COMPILER)
   #define XTD_ASSERT( expression , ... ) while ( !xtd::Debug::Assert( here(), !(!(expression)), #expression , ##__VA_ARGS__ ) ){}
 #else
   #define XTD_ASSERT( expression , ... ) while ( !xtd::Debug::Assert( here(), !(!(expression)), #expression , __VA_ARGS__ ) ){}
@@ -53,7 +53,7 @@ namespace xtd{
     static void Dump(const _Ty& value, const char * name, const source_location& location){ _::DebugDump<const _Ty&>::Dump(value, name, location); }
 
 
-  #if ((XTD_OS_MINGW|XTD_OS_WINDOWS) & XTD_OS)
+  #if (XTD_OS_WINDOWS & XTD_OS)
     template <typename ... _ArgTs>
     static bool Assert(const source_location& location, bool test, const char * test_str, _ArgTs&&...oArgs){
       if (test) return true;

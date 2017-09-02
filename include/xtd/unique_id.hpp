@@ -9,19 +9,20 @@
 #include <xtd/string.hpp>
 #include <ios>
 #include <fstream>
+#include <cstring>
 #include "exception.hpp"
 
 #if (XTD_COMPILER_MSVC & XTD_COMPILER)
   #pragma comment(lib, "rpcrt4")
 #endif
 
-#if (XTD_HAS_LIBUUID)
+#if (XTD_HAS_UUID)
   #include <uuid/uuid.h>
 #endif
 
 namespace xtd{
-#if ((XTD_OS_MSYS|XTD_OS_LINUX|XTD_OS_CYGWIN) & XTD_OS)
-  #if (XTD_HAS_LIBUUID)
+#if (XTD_OS_UNIX & XTD_OS)
+  #if (XTD_HAS_UUID)
     class unique_id{
     public:
       unique_id(){
@@ -110,7 +111,7 @@ namespace xtd{
     };
   }
 
-#elif ((XTD_OS_WINDOWS & XTD_OS) || (XTD_OS_MINGW & XTD_OS))
+#elif (XTD_OS_WINDOWS & XTD_OS)
 
   class unique_id : uuid_t{
     template <typename, typename> friend class _::xstring_format;

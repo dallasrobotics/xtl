@@ -2,21 +2,25 @@
 main system and unit test entry point 
 @copyright David Mott (c) 2016. Distributed under the Boost Software License Version 1.0. See LICENSE.md or http://boost.org/LICENSE_1_0.txt for details.
 */
+
+#define _WIN32_WINNT 0x600
+
 #include <xtd/xtd.hpp>
 
 #include <string>
+
+#include "gtest/gtest.h"
 
 #if (XTD_COMPILER_MSVC & XTD_COMPILER)
   #pragma warning(push, 0)
 #endif
 
-#include "gtest/gtest.h"
 
 #if (XTD_COMPILER_MSVC & XTD_COMPILER)
   #pragma warning(pop)
 #endif
 
-#if (ON==TEST_COM)
+#if (ON==TEST_COM) && (XTD_COMPILER_MSVC & XTD_COMPILER)
   #include "test_com.hpp"
 #endif
 
@@ -36,7 +40,7 @@ main system and unit test entry point
   #include "test_concurrent_stack.hpp"
 #endif
 
-#if (ON==TEST_DEBUG_HELP && ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS))
+#if (ON==TEST_DEBUG_HELP && (XTD_OS_WINDOWS & XTD_OS))
   #include "test_debug_help.hpp"
 #endif
 
@@ -128,8 +132,10 @@ main system and unit test entry point
   #include "test_var.hpp"
 #endif
 
-int main(int argc, char *argv[]){
+#undef forever
+#include "src/gtest-all.cc"
+
+int main(int argc, char *argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

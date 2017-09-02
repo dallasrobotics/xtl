@@ -9,7 +9,7 @@ handle necessary filesystem and path functionality until C++17 is finalized
 
 #include <xtd/string.hpp>
 
-#if ((XTD_OS_CYGWIN | XTD_OS_MSYS | XTD_OS_LINUX) & XTD_OS)
+#if (XTD_OS_UNIX & XTD_OS)
   #include <sys/stat.h>
   #include <paths.h>
 #else
@@ -17,12 +17,142 @@ handle necessary filesystem and path functionality until C++17 is finalized
 #include <xtd/meta.hpp>
 #endif
 
+#include <xtd/exception.hpp>
+
 #if (XTD_HAS_FILESYSTEM)
-  #include <filesystem>
+
+#include <filesystem>
+
 #elif (XTD_HAS_EXP_FILESYSTEM)
-  #include <experimental/filesystem>
+
+#include <experimental/filesystem>
+
 #endif
 
+#if (XTD_HAS_FILESYSTEM || XTD_HAS_EXP_FILESYSTEM)
+
+
+  namespace xtd{
+    namespace filesystem{
+      using namespace std::experimental::filesystem;
+    }
+  }
+
+
+#else
+
+
+namespace xtd{
+  namespace filesystem{
+
+    struct path : xtd::xstring<char> {
+
+#if(XTD_OS_WINDOWS & XTD_OS)
+      static const char preferred_separator = '\\';
+      static const char not_preferred_separator = '/';
+#else
+      static const char preferred_separator = '/';
+      static const char not_preferred_separator = '\\';
+#endif
+
+      template <typename ... _ArgTs> path(_ArgTs&&...oArgs) : xtd::string(std::forward<_ArgTs>(oArgs)...){}
+
+      xtd::string& string() { return *this; }
+      const xtd::string& string() const { return *this; }
+
+      ///appends a perferred separator and path element
+      path& append(const path& src){
+        if (preferred_separator != back() && not_preferred_separator != back()
+            && preferred_separator != src.front() && not_preferred_separator != src.front())
+        {
+          append(1, preferred_separator);
+        }
+        append(src.string().c_str());
+        trim();
+        return *this;
+      }
+
+      path& operator/=(const path& src) { return append(src); }
+
+      //replaces all non-preferred separators with preferred separators
+      path& make_preferred(){
+        if (!length()) return *this;
+        replace({not_preferred_separator}, preferred_separator);
+        return *this;
+      }
+
+      //removes the last path element if it doesn't end in a separator
+      path& remove_filename(){
+        if (!length()) return *this;
+        if (preferred_separator == back() || not_preferred_separator==back()) return *this;
+        auto isep = find_last_of({preferred_separator, not_preferred_separator});
+        if (xtd::string::npos != isep) erase(isep+1);
+        return *this;
+      }
+
+      path& replace_filename(const path& replacement){
+        remove_filename();
+        return operator/=(replacement);
+      }
+    private:
+      xtd::string _str;
+    };
+
+
+    inline bool remove(const path& oPath) { return (0==std::remove(oPath.c_str())); }
+
+//temp_directory_path
+#if (XTD_OS_WINDOWS & XTD_OS)
+
+
+    inline path temp_directory_path() {
+      xtd::string sTemp(1 + MAX_PATH, 0);
+      sTemp.resize(xtd::windows::exception::throw_if(GetTempPath(MAX_PATH, &sTemp[0]), [](DWORD d){return 0 == d;}));
+      return path(sTemp);
+    }
+
+
+#elif (XTD_OS_UNIX & XTD_OS)
+
+
+    inline path temp_directory_path(){
+      auto sTemp = getenv("TMPDIR");
+      if (sTemp && strlen(sTemp)) return path(sTemp);
+      sTemp = getenv("TEMP");
+      if (sTemp && strlen(sTemp)) return path(sTemp);
+#if defined(P_tmpdir)
+      return path(P_tmpdir);
+#endif
+#if defined(_PATH_TMP)
+      return path(_PATH_TMP);
+#endif
+      throw xtd::exception(here(), "Unable to determine temp path");
+    }
+
+
+#endif
+
+
+
+  }
+}
+
+#endif
+
+
+//Custom extensions to std::filesystem
+
+namespace xtd{
+  namespace filesystem{
+
+  }
+}
+
+
+
+
+#if 0
+/*
 #include <stdlib.h>
 
 namespace xtd {
@@ -34,6 +164,7 @@ namespace xtd {
     }
   }
 }
+*/
 
 #if (XTD_HAS_EXP_FILESYSTEM)
 namespace xtd {
@@ -70,6 +201,7 @@ namespace xtd {
 
     static inline bool is_directory(const path& oPath) { return FILE_ATTRIBUTE_DIRECTORY & GetFileAttributes(xtd::tstring::format(oPath.string().c_str()).c_str()) ? true : false; }
 
+#if (XTD_OS_WINDOWS & XTD_OS)
     template <const KNOWNFOLDERID & _id>
     static inline path known_path() {
       PWSTR sTemp;
@@ -79,7 +211,7 @@ namespace xtd {
     }
 
     static inline path home_directory_path() { return known_path<FOLDERID_Profile>(); }
-#else
+  #else
     static inline path home_directory_path() { return path(getenv("HOME")); }
 #endif
 
@@ -109,7 +241,7 @@ namespace xtd{
 
     class path : public path_base{
     public:
-#if ((XTD_OS_MINGW|XTD_OS_WINDOWS) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
       static constexpr value_type preferred_separator  = '\\';
       static constexpr value_type non_preferred_separator  = '/';
 #else
@@ -177,7 +309,7 @@ namespace xtd{
     };
 
 
-#if ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
     inline path temp_directory_path() {
       xtd::string sTemp(1 + MAX_PATH, 0);
       sTemp.resize(xtd::windows::exception::throw_if(GetTempPath(MAX_PATH, &sTemp[0]), [](DWORD d){return 0 == d;}));
@@ -284,3 +416,5 @@ namespace xtd {
     }
   }
 }
+#endif
+#endif

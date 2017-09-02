@@ -6,18 +6,18 @@ general purpose socket communication
 #pragma once
 #include <xtd/xtd.hpp>
 
-#if ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
   #include <Ws2ipdef.h>
   #include <ws2tcpip.h>
-  static_assert(_WIN32_WINNT >= 0x600, "unsupported target Windows version");
+  static_assert(_WIN32_WINNT >= 0x500, "unsupported target Windows version");
   #define poll WSAPoll
 #endif
 
-#if (XTD_OS_MINGW & XTD_OS)
+#if (XTD_COMPILER_MINGW & XTD_COMPILER)
   #include <mswsock.h>
 #endif
 
-#if ((XTD_OS_LINUX | XTD_OS_CYGWIN | XTD_OS_MSYS) & XTD_OS)
+#if (XTD_OS_UNIX & XTD_OS)
   #include <sys/socket.h>
   #include <sys/ioctl.h>
   #include <netinet/in.h>
@@ -46,14 +46,14 @@ namespace xtd{
     /// @addtogroup Sockets
     /// @{
 #if (!DOXY_INVOKED)
-#if ((XTD_OS_LINUX | XTD_OS_CYGWIN | XTD_OS_MSYS) & XTD_OS)
-    using SOCKET = int;
+#if (XTD_COMPILER_MINGW & XTD_COMPILER)
+    using POLLFD=WSAPOLLFD;
+#elif (XTD_OS_UNIX & XTD_OS)
+  using SOCKET = int;
   #define closesocket close
   #define ioctlsocket ioctl
 #elif (XTD_OS_WINDOWS & XTD_OS)
     using POLLFD = pollfd;
-#elif (XTD_OS_MINGW & XTD_OS)
-    using POLLFD = WSAPOLLFD;
 #endif
 #endif
     ///Represents an socket error
@@ -83,8 +83,11 @@ namespace xtd{
         using value_type = _Ty;
         static value_type get(SOCKET s){
           value_type iRet;
-          //mingw & winsock the size parameter is int while it's unsigned int on linux
-          std::remove_pointer<typename get_parameter<4, decltype(getsockopt)>::type>::type iSize = sizeof(value_type);
+#if  (XTD_COMPILER_MSVC & XTD_COMPILER)
+          int iSize = sizeof(value_type);
+#else
+          std::remove_pointer<typename xtd::template get_parameter<4, decltype(getsockopt)>::type>::type iSize = sizeof(value_type);
+#endif
           socket::exception::throw_if(getsockopt(s, level, optname, reinterpret_cast<char*>(&iRet), &iSize), [](int i){ return (i<0); });
           return iRet;
         }
@@ -164,7 +167,7 @@ namespace xtd{
     ///Serializes data on a socket
     template <typename> class serializer;
 
-#if ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
     /** Initializes WinSock
     Winsock requires a call to WSAStartup before any other calls to the winsock library.
     winsock_initializer is a global static that ensures winsock is initialized and cleaned up properly
@@ -227,7 +230,7 @@ namespace xtd{
       /// constructors
       /// @{
       socket_base() : _Socket(0){
-#if ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
         winsock_initializer::get();
 #endif
         _Socket = xtd::crt_exception::throw_if(::socket(address_type::address_family, (int)type, (int)protocol), [](SOCKET s){ return static_cast<SOCKET>(-1) == s; });
@@ -342,7 +345,7 @@ namespace xtd{
       callback<void()> error_event;
       /// begins polling the socket for events for a period of Timeout
       void poll(int Timeout){
-        class pollfd oPoll;
+        struct pollfd oPoll;
         oPoll.events = POLLIN | POLLOUT;
         oPoll.fd = _SuperT::_Socket;
         oPoll.revents = 0;
@@ -366,7 +369,7 @@ namespace xtd{
       template<typename ... _ArgTs>
       explicit polling_socket(_ArgTs &&...oArgs) : _SuperT(std::forward<_ArgTs>(oArgs)...){}
 
-#if ((XTD_OS_WINDOWS | XTD_OS_MINGW) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
       int poll(POLLFD *ufds, unsigned int nfds, int timeout){ return ::WSAPoll(ufds, nfds, timeout); }
 #endif
     };
@@ -449,7 +452,7 @@ namespace xtd{
       /// ctor
       template<typename ... _ArgTs>
       explicit ip_options(_ArgTs&&...oArgs) : _SuperT(std::forward<_ArgTs>(oArgs)...){}
-#if ((XTD_OS_MINGW | XTD_OS_WINDOWS) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
       /// gets the IP_DONTFRAGMENT property
       bool dont_fragment() const{ return (_::socket_option<int, IPPROTO_IP, IP_DONTFRAGMENT>::get(_SuperT::_Socket) ? true : false); }
       /// sets the IP_DONTFRAGMENT property
@@ -483,7 +486,7 @@ namespace xtd{
       template<typename ... _ArgTs>
       explicit udp_options(_ArgTs&&...oArgs) : _SuperT(std::forward<_ArgTs>(oArgs)...){}
 
-#if ((XTD_OS_MINGW | XTD_OS_WINDOWS) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
       /// gets the UDP_NOCHECKSUM property
       bool no_checksum() const{ return (_::socket_option<int, IPPROTO_UDP, UDP_NOCHECKSUM>::get(_SuperT::_Socket) ? true : false); }
       /// sets the UDP_NOCHECKSUM property
@@ -523,7 +526,7 @@ namespace xtd{
         tv.tv_sec = WaitMS / 1000;
         WaitMS %= 1000;
         tv.tv_usec = WaitMS / 1000;
-#if (XTD_OS_MINGW & XTD_OS)
+#if (XTD_COMPILER_MINGW & XTD_COMPILER)
         auto iRet = xtd::crt_exception::throw_if(::select(1 + (SOCKET)*this, &fdRead, &fdWrite, &fdErr, reinterpret_cast<PTIMEVAL>(&tv)), [](int i){return i < 0; });
 #else
         auto iRet = xtd::crt_exception::throw_if(::select(1 + (SOCKET)*this, &fdRead, &fdWrite, &fdErr, &tv), [](int i){return i < 0; });

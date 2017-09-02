@@ -167,7 +167,7 @@ namespace xtd{
       return rtrim();
     }
 
-    //replaces all occurances of the characters in the oItems list with a specified character
+    //replaces all occurrences of the characters in the oItems list with a specified character
     xstring& replace(std::initializer_list<_ChT> oItems, _ChT chReplace) {
       for (auto & oCh : *this) {
         bool bFound = false;
@@ -184,6 +184,7 @@ namespace xtd{
       return *this;
     }
 
+    ///replaces all instances of a sub-string with a character
     xstring& replace(const xstring& src, _ChT chReplace) {
       forever{
         auto i = _super_t::find(src.c_str());
@@ -194,6 +195,7 @@ namespace xtd{
       return *this;
     }
 
+    ///removes all occurrences of a list
     xstring& remove(const std::initializer_list<_ChT>& chars) {
       forever{
         bool found = false;
@@ -210,14 +212,14 @@ namespace xtd{
 
     ///finds the first occurrence of any item
     size_type find_first_of(const std::initializer_list<_ChT>& delimiters, size_type pos = 0) const{
-      size_type sRet = _super_t::npos;
+      size_type iRet = _super_t::npos;
       for (const _ChT ch : delimiters){
         auto x = _super_t::find_first_of(ch, pos);
-        if ((_super_t::npos != x) && (_super_t::npos == sRet || x < sRet)){
-          sRet = x;
+        if ((_super_t::npos != x) && (_super_t::npos == iRet || x < iRet)){
+          iRet = x;
         }
       }
-      return sRet;
+      return iRet;
     }
     ///finds the first occurrence of an item from a user-defined visitor
     size_type find_first_of(const std::function<bool(_ChT)>& VisitorFN, size_type pos = 0) const{
@@ -225,6 +227,17 @@ namespace xtd{
         if (VisitorFN(_super_t::at(i))) return i;
       }
       return _super_t::npos;
+    }
+
+    size_type find_last_of(const std::initializer_list<_ChT>& delimiters, size_type pos = _super_t::npos) const {
+      size_type iRet = _super_t::npos;
+      for (const _ChT ch : delimiters){
+        auto x = _super_t::find_last_of(ch, pos);
+        if ((_super_t::npos != x) && (_super_t::npos == iRet || x > iRet)){
+          iRet = x;
+        }
+      }
+      return iRet;
     }
 
     ///splits the string by the specified delmiters into constituent elements
@@ -412,7 +425,8 @@ namespace xtd{
         string sRet(srclen, 0);
         forever{
           //srclen = wcstombs_s(&sRet[0], sRet.size(), src, sRet.size());
-          wcstombs_s(&srclen, &sRet[0], sRet.size(), src, sRet.size());
+          //wcstombs_s(&srclen, &sRet[0], sRet.size(), src, sRet.size());
+          std::wcstombs(&sRet[0], src, sRet.size());
         if (static_cast<size_t>(-1) == srclen){
           throw std::runtime_error("A string conversion error occurred");
         }
@@ -434,7 +448,8 @@ namespace xtd{
         wstring sRet(1+srclen, '\0');
         forever{
           //srclen = mbstowcs_s(&sRet[0], sRet.size(), src, sRet.size());
-          mbstowcs_s(&srclen , &sRet[0], sRet.size(), src, sRet.size());
+          //mbstowcs_s(&srclen , &sRet[0], sRet.size(), src, sRet.size());
+          std::mbstowcs(&sRet[0], src, sRet.size());
         if (static_cast<size_t>(-1) == srclen){
           throw std::runtime_error("A string conversion error occurred");
         }
@@ -578,7 +593,7 @@ namespace xtd{
     };
 
 
-#if ((XTD_OS_MINGW | XTD_OS_WINDOWS) & XTD_OS)
+#if (XTD_OS_WINDOWS & XTD_OS)
     template <> class xstring_format<char, const DWORD &>{
     public:
       inline static string format(const DWORD & value){
